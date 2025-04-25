@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criterion Collection Movie Recommender</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #recommendations {
+            margin-top: 20px;
+        }
+        .movie {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Criterion Collection Movie Recommender</h1>
+        <p>Describe your movie preferences, and we'll recommend some films from the Criterion Collection.</p>
+        
+        <textarea id="preferences" rows="4" placeholder="Example: I enjoy psychological thrillers with complex characters and dark themes..."></textarea>
+        <button onclick="getRecommendations()">Get Recommendations</button>
+        
+        <div id="recommendations"></div>
+    </div>
+
+    <script>
+        async function getRecommendations() {
+            const preferences = document.getElementById('preferences').value;
+            const recommendationsDiv = document.getElementById('recommendations');
+            
+            if (!preferences) {
+                recommendationsDiv.innerHTML = '<p class="error">Please enter your preferences.</p>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/recommend', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ preferences }),
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    recommendationsDiv.innerHTML = `<p class="error">${data.error}</p>`;
+                    return;
+                }
+                
+                let html = '<h2>Recommended Movies:</h2>';
+                data.recommendations.forEach(movie => {
+                    html += `
+                        <div class="movie">
+                            <h3>${movie.title}</h3>
+                            <p><strong>Director:</strong> ${movie.director}</p>
+                            <p>${movie.description}</p>
+                        </div>
+                    `;
+                });
+                
+                recommendationsDiv.innerHTML = html;
+                
+            } catch (error) {
+                recommendationsDiv.innerHTML = '<p class="error">An error occurred while getting recommendations.</p>';
+            }
+        }
+    </script>
+</body>
+</html> 
