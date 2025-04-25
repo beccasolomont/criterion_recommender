@@ -22,17 +22,31 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = 'cache'
 EMBEDDINGS_CACHE = os.path.join(CACHE_DIR, 'movie_embeddings.pkl')
 
-# Initialize model at module level with memory optimization
-try:
-    logger.info("Loading sentence transformer model...")
-    model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
-    # Clear memory after model loading
-    gc.collect()
-    logger.info("Model loaded successfully")
-except Exception as e:
-    logger.error(f"Error loading model: {str(e)}")
-    logger.error(traceback.format_exc())
-    raise
+# Global variables for caching
+_movies = None
+_embeddings = None
+_model = None
+
+def initialize_embeddings():
+    """Initialize embeddings at application startup."""
+    global _movies, _embeddings, _model
+    
+    try:
+        # Load or create model
+        if _model is None:
+            logger.info("Loading sentence transformer model...")
+            _model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+            gc.collect()
+            logger.info("Model loaded successfully")
+        
+        # Load or create embeddings
+        if _movies is None or _embeddings is None:
+            _movies, _embeddings = load_or_create_embeddings()
+            
+    except Exception as e:
+        logger.error(f"Error initializing embeddings: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
 
 def load_or_create_embeddings():
     """Load cached embeddings or create new ones if not available."""
@@ -73,7 +87,7 @@ def load_or_create_embeddings():
         for i in tqdm(range(0, len(descriptions), batch_size), desc="Generating embeddings"):
             try:
                 batch = descriptions[i:i + batch_size]
-                batch_embeddings = model.encode(batch, show_progress_bar=False)
+                batch_embeddings = _model.encode(batch, show_progress_bar=False)
                 embeddings.extend(batch_embeddings)
                 # Clear memory after each batch
                 gc.collect()
@@ -112,30 +126,31 @@ def get_recommendations(preferences: str, num_recommendations: int = 5) -> List[
     Returns:
         List[Dict]: List of recommended movies with their details
     """
+    global _movies, _embeddings, _model
+    
     # Input validation
     if not preferences or not isinstance(preferences, str):
         raise ValueError("Invalid preferences provided")
     
     try:
-        logger.info("Getting cached movies and embeddings...")
-        movies, embeddings = load_or_create_embeddings()
+        # Ensure embeddings are loaded
+        if _movies is None or _embeddings is None:
+            logger.info("Embeddings not initialized, loading now...")
+            _movies, _embeddings = load_or_create_embeddings()
         
         logger.info("Creating embedding for user preferences...")
         # Create embedding for the user preferences
-        user_embedding = model.encode([preferences], show_progress_bar=False)[0]
+        user_embedding = _model.encode([preferences], show_progress_bar=False)[0]
         
         logger.info("Calculating similarities...")
         # Calculate similarities
-        similarities = np.dot(embeddings, user_embedding)
+        similarities = np.dot(_embeddings, user_embedding)
         
         # Get top recommendations
         top_indices = np.argsort(similarities)[-num_recommendations:][::-1]
         
         # Return recommended movies
-        recommendations = [movies[i] for i in top_indices]
-        
-        # Clear memory
-        gc.collect()
+        recommendations = [_movies[i] for i in top_indices]
         
         logger.info(f"Successfully generated {len(recommendations)} recommendations")
         return recommendations

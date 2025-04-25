@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-from recommender import get_recommendations
+from recommender import get_recommendations, initialize_embeddings
 import logging
 import traceback
 import json
@@ -14,6 +14,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Initialize embeddings at startup
+try:
+    logger.info("Initializing embeddings at startup...")
+    initialize_embeddings()
+    logger.info("Embeddings initialized successfully")
+except Exception as e:
+    logger.error(f"Error initializing embeddings: {str(e)}")
+    logger.error(traceback.format_exc())
+    # Don't raise the exception, as we want the app to start even if embeddings fail
+    # They will be generated on first request if needed
 
 @app.route('/')
 def index():
