@@ -38,7 +38,8 @@ def initialize_embeddings():
             logger.info("Loading sentence transformer model...")
             # Set device to CPU and disable tokenizers parallelism
             os.environ['TOKENIZERS_PARALLELISM'] = 'false'
-            _model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+            # Use a smaller model
+            _model = SentenceTransformer('paraphrase-MiniLM-L3-v2', device='cpu')
             # Clear CUDA cache if available
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -93,7 +94,7 @@ def load_or_create_embeddings():
         for i in tqdm(range(0, len(descriptions), batch_size), desc="Generating embeddings"):
             try:
                 batch = descriptions[i:i + batch_size]
-                batch_embeddings = _model.encode(batch, show_progress_bar=False)
+                batch_embeddings = _model.encode(batch, show_progress_bar=False, convert_to_numpy=True)
                 embeddings.extend(batch_embeddings)
                 # Clear memory after each batch
                 if torch.cuda.is_available():
@@ -148,7 +149,7 @@ def get_recommendations(preferences: str, num_recommendations: int = 5) -> List[
         
         logger.info("Creating embedding for user preferences...")
         # Create embedding for the user preferences
-        user_embedding = _model.encode([preferences], show_progress_bar=False)[0]
+        user_embedding = _model.encode([preferences], show_progress_bar=False, convert_to_numpy=True)[0]
         
         logger.info("Calculating similarities...")
         # Calculate similarities
