@@ -6,8 +6,10 @@ import logging
 import os
 import json
 import pickle
+import gc
 from functools import lru_cache
 import traceback
+from tqdm import tqdm
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -17,10 +19,12 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = 'cache'
 EMBEDDINGS_CACHE = os.path.join(CACHE_DIR, 'movie_embeddings.pkl')
 
-# Initialize model at module level
+# Initialize model at module level with memory optimization
 try:
     logger.info("Loading sentence transformer model...")
     model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+    # Clear memory after model loading
+    gc.collect()
     logger.info("Model loaded successfully")
 except Exception as e:
     logger.error(f"Error loading model: {str(e)}")
@@ -30,14 +34,17 @@ def load_or_create_embeddings():
     """Load cached embeddings or create new ones if not available."""
     try:
         # Create cache directory if it doesn't exist
-        if not os.path.exists(CACHE_DIR):
-            os.makedirs(CACHE_DIR)
-            logger.info(f"Created cache directory at {CACHE_DIR}")
+        cache_dir = 'cache'
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
+            logger.info(f"Created cache directory at {cache_dir}")
+        
+        cache_file = os.path.join(cache_dir, 'movie_embeddings.pkl')
         
         # Try to load cached embeddings
-        if os.path.exists(EMBEDDINGS_CACHE):
+        if os.path.exists(cache_file):
             try:
-                with open(EMBEDDINGS_CACHE, 'rb') as f:
+                with open(cache_file, 'rb') as f:
                     logger.info("Loading cached movie embeddings...")
                     movies, embeddings = pickle.load(f)
                     logger.info(f"Loaded {len(movies)} movies from cache")
@@ -47,35 +54,36 @@ def load_or_create_embeddings():
         
         # If no cache or error, create new embeddings
         logger.info("Creating new movie embeddings...")
-        criterion_movies = get_criterion_movies()
-        if not criterion_movies:
+        movies = get_criterion_movies()
+        if not movies:
             raise ValueError("No movies found in the database")
         
-        logger.info(f"Loaded {len(criterion_movies)} movies from database")
+        logger.info(f"Loaded {len(movies)} movies from database")
         
-        # Generate embeddings in batches
-        batch_size = 8
-        descriptions = [movie['description'] for movie in criterion_movies]
+        # Generate embeddings in smaller batches with memory cleanup
+        batch_size = 4  # Reduced batch size
+        descriptions = [movie['description'] for movie in movies]
         embeddings = []
         
-        for i in range(0, len(descriptions), batch_size):
+        for i in tqdm(range(0, len(descriptions), batch_size), desc="Generating embeddings"):
             batch = descriptions[i:i + batch_size]
-            logger.info(f"Processing batch {i//batch_size + 1}/{(len(descriptions) + batch_size - 1)//batch_size}")
             batch_embeddings = model.encode(batch, show_progress_bar=False)
             embeddings.extend(batch_embeddings)
+            # Clear memory after each batch
+            gc.collect()
         
         embeddings = np.array(embeddings)
         logger.info("Embeddings generated successfully")
         
         # Cache the embeddings
         try:
-            with open(EMBEDDINGS_CACHE, 'wb') as f:
-                pickle.dump((criterion_movies, embeddings), f)
+            with open(cache_file, 'wb') as f:
+                pickle.dump((movies, embeddings), f)
             logger.info("Cached movie embeddings")
         except Exception as e:
             logger.warning(f"Error caching embeddings: {str(e)}")
         
-        return criterion_movies, embeddings
+        return movies, embeddings
         
     except Exception as e:
         logger.error(f"Error in load_or_create_embeddings: {str(e)}")
@@ -98,8 +106,7 @@ def get_recommendations(preferences: str, num_recommendations: int = 5) -> List[
     
     try:
         logger.info("Getting cached movies and embeddings...")
-        # Get cached movies and embeddings
-        criterion_movies, movie_embeddings = load_or_create_embeddings()
+        movies, embeddings = load_or_create_embeddings()
         
         logger.info("Creating embedding for user preferences...")
         # Create embedding for the user preferences
@@ -107,13 +114,16 @@ def get_recommendations(preferences: str, num_recommendations: int = 5) -> List[
         
         logger.info("Calculating similarities...")
         # Calculate similarities
-        similarities = np.dot(movie_embeddings, user_embedding)
+        similarities = np.dot(embeddings, user_embedding)
         
         # Get top recommendations
         top_indices = np.argsort(similarities)[-num_recommendations:][::-1]
         
         # Return recommended movies
-        recommendations = [criterion_movies[i] for i in top_indices]
+        recommendations = [movies[i] for i in top_indices]
+        
+        # Clear memory
+        gc.collect()
         
         logger.info(f"Successfully generated {len(recommendations)} recommendations")
         return recommendations
