@@ -11,6 +11,8 @@ services:
         value: 1
       - key: TRANSFORMERS_CACHE
         value: /tmp/transformers_cache
+      - key: TOKENIZERS_PARALLELISM
+        value: "false"
       - key: PORT
         value: 10000
       - key: GUNICORN_CMD_ARGS

@@ -10,6 +10,7 @@ import gc
 from functools import lru_cache
 import traceback
 from tqdm import tqdm
+import torch
 
 # Set up logging
 logging.basicConfig(
@@ -35,7 +36,12 @@ def initialize_embeddings():
         # Load or create model
         if _model is None:
             logger.info("Loading sentence transformer model...")
+            # Set device to CPU and disable tokenizers parallelism
+            os.environ['TOKENIZERS_PARALLELISM'] = 'false'
             _model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+            # Clear CUDA cache if available
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             gc.collect()
             logger.info("Model loaded successfully")
         
@@ -80,7 +86,7 @@ def load_or_create_embeddings():
         logger.info(f"Loaded {len(movies)} movies from database")
         
         # Generate embeddings in smaller batches with memory cleanup
-        batch_size = 2  # Reduced batch size further
+        batch_size = 1  # Process one at a time to minimize memory usage
         descriptions = [movie['description'] for movie in movies]
         embeddings = []
         
@@ -90,6 +96,8 @@ def load_or_create_embeddings():
                 batch_embeddings = _model.encode(batch, show_progress_bar=False)
                 embeddings.extend(batch_embeddings)
                 # Clear memory after each batch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
                 gc.collect()
             except Exception as e:
                 logger.error(f"Error processing batch {i//batch_size + 1}: {str(e)}")
