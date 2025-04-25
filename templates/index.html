@@ -129,20 +129,29 @@
                     body: JSON.stringify({ preferences }),
                 });
                 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to get recommendations');
+                let data;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    console.error('Error parsing JSON:', e);
+                    throw new Error('Invalid response from server');
                 }
                 
-                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || `Server error: ${response.status}`);
+                }
                 
-                if (data.error) {
-                    recommendationsDiv.innerHTML = `<p class="error">${data.error}</p>`;
-                    return;
+                if (!data.recommendations || !Array.isArray(data.recommendations)) {
+                    throw new Error('Invalid response format');
                 }
                 
                 let html = '<h2>Recommended Movies:</h2>';
                 data.recommendations.forEach(movie => {
+                    if (!movie.title || !movie.director || !movie.description) {
+                        console.warn('Invalid movie data:', movie);
+                        return;
+                    }
+                    
                     html += `
                         <div class="movie">
                             <h3>${movie.title}</h3>
@@ -155,8 +164,13 @@
                 recommendationsDiv.innerHTML = html;
                 
             } catch (error) {
-                recommendationsDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
                 console.error('Error:', error);
+                recommendationsDiv.innerHTML = `
+                    <p class="error">
+                        Error: ${error.message}<br>
+                        Please try again later.
+                    </p>
+                `;
             } finally {
                 // Re-enable the button
                 recommendButton.disabled = false;
