@@ -1,30 +1,13 @@
-from flask import Flask, render_template, request, jsonify
-from recommender import get_recommendations, initialize_embeddings
+from flask import Flask, request, jsonify, render_template
+from recommender import get_recommendations
 import logging
-import traceback
-import json
-import sys
+import os
 
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    stream=sys.stdout
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-
-# Initialize embeddings at startup
-try:
-    logger.info("Initializing embeddings at startup...")
-    initialize_embeddings()
-    logger.info("Embeddings initialized successfully")
-except Exception as e:
-    logger.error(f"Error initializing embeddings: {str(e)}")
-    logger.error(traceback.format_exc())
-    # Don't raise the exception, as we want the app to start even if embeddings fail
-    # They will be generated on first request if needed
 
 @app.route('/')
 def index():
@@ -33,55 +16,20 @@ def index():
 @app.route('/recommend', methods=['POST'])
 def recommend():
     try:
-        logger.info("Received recommendation request")
-        
-        # Get and validate request data
-        if not request.is_json:
-            logger.error("Request is not JSON")
-            return jsonify({'error': 'Request must be JSON'}), 400
-            
         data = request.get_json()
-        logger.info(f"Request data: {json.dumps(data)}")
+        logger.info(f"Request data: {data}")
         
-        if not data:
-            logger.error("No data provided in request")
-            return jsonify({'error': 'No data provided'}), 400
-            
         preferences = data.get('preferences', '')
         if not preferences:
-            logger.error("Empty preferences provided")
-            return jsonify({'error': 'Preferences cannot be empty'}), 400
+            return jsonify({'error': 'No preferences provided'}), 400
             
         logger.info("Getting recommendations...")
-        try:
-            # Get recommendations
-            recommendations = get_recommendations(preferences)
-            logger.info(f"Got {len(recommendations)} recommendations")
-            
-            # Format response
-            response_data = {
-                'recommendations': recommendations
-            }
-            
-            logger.info("Sending response")
-            return jsonify(response_data)
-            
-        except Exception as e:
-            logger.error(f"Error in get_recommendations: {str(e)}")
-            logger.error(traceback.format_exc())
-            return jsonify({
-                'error': 'Error generating recommendations. Please try again later.'
-            }), 500
-            
-    except Exception as e:
-        # Log the full error traceback
-        logger.error(f"Error in recommend endpoint: {str(e)}")
-        logger.error(traceback.format_exc())
+        recommendations = get_recommendations(preferences)
+        return jsonify({'recommendations': recommendations})
         
-        # Return a properly formatted error response
-        return jsonify({
-            'error': 'An unexpected error occurred. Please try again later.'
-        }), 500
+    except Exception as e:
+        logger.error(f"Error in recommend: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000))) 
