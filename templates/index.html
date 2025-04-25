@@ -49,6 +49,15 @@
         .error {
             color: red;
             margin-top: 10px;
+            padding: 10px;
+            background-color: #fff0f0;
+            border: 1px solid #ffcccc;
+            border-radius: 4px;
+        }
+        .loading {
+            color: #666;
+            margin-top: 10px;
+            font-style: italic;
         }
     </style>
 </head>
@@ -73,6 +82,8 @@
                 return;
             }
             
+            recommendationsDiv.innerHTML = '<p class="loading">Generating recommendations...</p>';
+            
             try {
                 const response = await fetch('/recommend', {
                     method: 'POST',
@@ -81,6 +92,11 @@
                     },
                     body: JSON.stringify({ preferences }),
                 });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to get recommendations');
+                }
                 
                 const data = await response.json();
                 
@@ -103,7 +119,8 @@
                 recommendationsDiv.innerHTML = html;
                 
             } catch (error) {
-                recommendationsDiv.innerHTML = '<p class="error">An error occurred while getting recommendations.</p>';
+                recommendationsDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+                console.error('Error:', error);
             }
         }
     </script>
