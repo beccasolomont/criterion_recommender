@@ -17,17 +17,14 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = 'cache'
 EMBEDDINGS_CACHE = os.path.join(CACHE_DIR, 'movie_embeddings.pkl')
 
-@lru_cache(maxsize=1)
-def get_model():
-    """Get the cached sentence transformer model."""
-    try:
-        logger.info("Loading sentence transformer model...")
-        model = SentenceTransformer('all-MiniLM-L6-v2')
-        logger.info("Model loaded successfully")
-        return model
-    except Exception as e:
-        logger.error(f"Error loading model: {str(e)}")
-        raise
+# Initialize model at module level
+try:
+    logger.info("Loading sentence transformer model...")
+    model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+    logger.info("Model loaded successfully")
+except Exception as e:
+    logger.error(f"Error loading model: {str(e)}")
+    raise
 
 def load_or_create_embeddings():
     """Load cached embeddings or create new ones if not available."""
@@ -55,11 +52,19 @@ def load_or_create_embeddings():
             raise ValueError("No movies found in the database")
         
         logger.info(f"Loaded {len(criterion_movies)} movies from database")
-        model = get_model()
         
-        logger.info("Generating embeddings for movie descriptions...")
+        # Generate embeddings in batches
+        batch_size = 8
         descriptions = [movie['description'] for movie in criterion_movies]
-        embeddings = model.encode(descriptions)
+        embeddings = []
+        
+        for i in range(0, len(descriptions), batch_size):
+            batch = descriptions[i:i + batch_size]
+            logger.info(f"Processing batch {i//batch_size + 1}/{(len(descriptions) + batch_size - 1)//batch_size}")
+            batch_embeddings = model.encode(batch, show_progress_bar=False)
+            embeddings.extend(batch_embeddings)
+        
+        embeddings = np.array(embeddings)
         logger.info("Embeddings generated successfully")
         
         # Cache the embeddings
@@ -98,8 +103,7 @@ def get_recommendations(preferences: str, num_recommendations: int = 5) -> List[
         
         logger.info("Creating embedding for user preferences...")
         # Create embedding for the user preferences
-        model = get_model()
-        user_embedding = model.encode([preferences])[0]
+        user_embedding = model.encode([preferences], show_progress_bar=False)[0]
         
         logger.info("Calculating similarities...")
         # Calculate similarities
