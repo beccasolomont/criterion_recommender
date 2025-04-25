@@ -6,4 +6,11 @@ services:
     startCommand: gunicorn app:app
     envVars:
       - key: PYTHON_VERSION
-        value: 3.9.0 
+        value: 3.9.0
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: TRANSFORMERS_CACHE
+        value: /tmp/transformers_cache
+    plan: free
+    memory: 512MB
+    buildTimeout: 1800 
