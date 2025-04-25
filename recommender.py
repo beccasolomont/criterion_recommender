@@ -12,7 +12,10 @@ import traceback
 from tqdm import tqdm
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Cache directory
@@ -28,6 +31,7 @@ try:
     logger.info("Model loaded successfully")
 except Exception as e:
     logger.error(f"Error loading model: {str(e)}")
+    logger.error(traceback.format_exc())
     raise
 
 def load_or_create_embeddings():
@@ -51,6 +55,7 @@ def load_or_create_embeddings():
                     return movies, embeddings
             except Exception as e:
                 logger.warning(f"Error loading cached embeddings: {str(e)}")
+                logger.warning(traceback.format_exc())
         
         # If no cache or error, create new embeddings
         logger.info("Creating new movie embeddings...")
@@ -82,11 +87,13 @@ def load_or_create_embeddings():
             logger.info("Cached movie embeddings")
         except Exception as e:
             logger.warning(f"Error caching embeddings: {str(e)}")
+            logger.warning(traceback.format_exc())
         
         return movies, embeddings
         
     except Exception as e:
         logger.error(f"Error in load_or_create_embeddings: {str(e)}")
+        logger.error(traceback.format_exc())
         raise
 
 def get_recommendations(preferences: str, num_recommendations: int = 5) -> List[Dict]:
