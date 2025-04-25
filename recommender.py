@@ -66,16 +66,21 @@ def load_or_create_embeddings():
         logger.info(f"Loaded {len(movies)} movies from database")
         
         # Generate embeddings in smaller batches with memory cleanup
-        batch_size = 4  # Reduced batch size
+        batch_size = 2  # Reduced batch size further
         descriptions = [movie['description'] for movie in movies]
         embeddings = []
         
         for i in tqdm(range(0, len(descriptions), batch_size), desc="Generating embeddings"):
-            batch = descriptions[i:i + batch_size]
-            batch_embeddings = model.encode(batch, show_progress_bar=False)
-            embeddings.extend(batch_embeddings)
-            # Clear memory after each batch
-            gc.collect()
+            try:
+                batch = descriptions[i:i + batch_size]
+                batch_embeddings = model.encode(batch, show_progress_bar=False)
+                embeddings.extend(batch_embeddings)
+                # Clear memory after each batch
+                gc.collect()
+            except Exception as e:
+                logger.error(f"Error processing batch {i//batch_size + 1}: {str(e)}")
+                logger.error(traceback.format_exc())
+                raise
         
         embeddings = np.array(embeddings)
         logger.info("Embeddings generated successfully")
