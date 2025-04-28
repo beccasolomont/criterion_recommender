@@ -24,4 +24,5 @@ services:
     plan: free
     memory: 512MB
     buildTimeout: 1800
-    healthCheckPath: / 
+    healthCheckPath: /
+    # Trigger new deployment 
