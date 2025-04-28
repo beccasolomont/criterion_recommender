@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criterion Collection Recommender</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            min-height: 100px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .recommendations {
+            margin-top: 20px;
+        }
+        .movie {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .movie h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .movie p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .loading {
+            text-align: center;
+            display: none;
+        }
+        .error {
+            color: #dc3545;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background-color: #f8d7da;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Criterion Collection Recommender</h1>
+        <p>Describe the kind of movie you're looking for, and we'll recommend some Criterion Collection films that match your preferences.</p>
+        
+        <textarea id="preferences" placeholder="Describe what kind of movie you're looking for..."></textarea>
+        <button onclick="getRecommendations()">Get Recommendations</button>
+        
+        <div class="loading" id="loading">
+            Loading recommendations...
+        </div>
+        
+        <div class="error" id="error"></div>
+        
+        <div class="recommendations" id="recommendations"></div>
+    </div>
+
+    <script>
+        async function getRecommendations() {
+            const preferences = document.getElementById('preferences').value;
+            if (!preferences) {
+                showError('Please describe what kind of movie you\'re looking for.');
+                return;
+            }
+
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const recommendations = document.getElementById('recommendations');
+
+            // Clear previous results
+            recommendations.innerHTML = '';
+            error.style.display = 'none';
+            loading.style.display = 'block';
+
+            try {
+                const response = await fetch('/recommend', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ preferences }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to get recommendations');
+                }
+
+                if (data.recommendations.length === 0) {
+                    recommendations.innerHTML = '<p>No recommendations found. Try being more specific in your description.</p>';
+                    return;
+                }
+
+                data.recommendations.forEach(movie => {
+                    const movieElement = document.createElement('div');
+                    movieElement.className = 'movie';
+                    movieElement.innerHTML = `
+                        <h3>${movie.title} (${movie.year})</h3>
+                        <p><strong>Director:</strong> ${movie.director}</p>
+                        <p>${movie.description}</p>
+                    `;
+                    recommendations.appendChild(movieElement);
+                });
+
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function showError(message) {
+            const error = document.getElementById('error');
+            error.textContent = message;
+            error.style.display = 'block';
+        }
+    </script>
+</body>
+</html> 

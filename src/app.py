@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, render_template
-from recommender import get_recommendations
+from .recommender import get_recommendations
 import logging
 import os
 import time
